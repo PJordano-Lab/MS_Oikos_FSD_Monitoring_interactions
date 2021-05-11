@@ -1,0 +1,358 @@
+---
+title: "CIs Modularity-Hato Ratón"
+author: "Pedro Jordano"
+date: "11/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Matrices
+
+Final matrix Names:
+
+`mn= Original mist-netting matrix from HR`
+`obs= Original censuses matrix from HR`
+`HRcualmerging= Cualitative matrix sum`
+`HRcuanmerging= Cuantitative matrix sum`
+`HRgtmerging = Grand Total Standarization`
+`HRminmaxmerging = Min-max scaled matrix`
+
+ 
+```{r}
+# Load matrices
+getwd()
+hr.mn<- read.csv("../Case_studies_datasets/hr_mn_clean.csv",header=T,sep=",",dec=".")
+hr.obs<- read.csv("../Case_studies_datasets/hr_obs_clean.csv",header=T,sep=",",dec=".")
+
+# Convert all interactions in numeric
+mn <- hr.mn%>%column_to_rownames(var="AASPECIES")
+#as.data.frame(lapply(hr.mn, as.numeric))
+
+obs <- hr.obs%>%column_to_rownames(var="AASPECIES")
+#as.data.frame(lapply((pl.cam),hr.obs, as.numeric))
+
+```
+
+# Combination methods
+
+```{r}
+#Qualitative combination
+HRcuanmerging <- mn+obs
+HRcualmerging= HRcuanmerging
+HRcualmerging[HRcuanmerging!=0]= 1
+
+#Quantitative sum
+HRcuanmerging <- mn+obs
+
+# Grand total
+mn.gts<- mn/sum(mn)
+obs.gts<- obs/sum(obs)
+HRgtmerging<- (mn.gts+obs.gts)/2
+sum(HRgtmerging)
+
+# Min-Max scaling
+mn.mms<- (mn-min(mn))/(max(mn)-min(mn))
+obs.mms<- (obs-min(obs))/(max(obs)-min(obs))
+HRminmaxmerging<- (mn.mms+obs.mms)/2
+
+```
+
+
+## Bootstrap estimates of network modularity (M)
+
+We estimate the confidence intervals by resampling the five adjacency matrices
+obtained from the different methods and computing their average, SE, and CIs for modularity.
+
+We use function `m_boot` for this.
+
+## Functions to load
+### Function to estimate M from bootstrapped matrices.
+
+```{r m_boot.function}
+# Function for Bootstrap loop to estimate M for resampled matrices. ------------
+# USE WITH: m_boot(mymat, myresamp). myresamp defaults to 99.
+m_boot <- function (mymat, myresamp= 99)  {
+	TIME <- Sys.time()
+	# Resampling plan for bootstrapping n=99 adjacency matrices.
+	m.boot<- NULL
+	# mat is the input matrix for which M is tested
+	# mlike is the observed mean M value (in general, mat@likelihood)
+	# The loop. PUT THIS IN A BOOT LOOP 
+	for (i in 1:myresamp) {
+		mat1 <- sample_frac(mymat, 0.8, replace= T)
+		mnmetrics <- computeModules(mat1, method="Beckett", 
+								   deep= FALSE, deleteOriginalFiles= FALSE, 
+								   steps= 1000, tolerance= 1e-10, 
+								   experimental= FALSE, forceLPA= FALSE)
+		m.boot<- rbind(m.boot, mnmetrics@likelihood)   
+	}
+	colnames(m.boot)<- c("MBoot") # m.boot saves the M values for bootstrapped 
+								  # matrices.
+	return(m.boot)
+	#
+	Sys.time() - TIME
+	#
+} 
+
+```
+
+
+# Modularity
+
+Final matrix Names:
+
+`mn= Original mist-netting matrix from HR`
+`obs= Original censuses matrix from HR`
+`HRcualmerging= Cualitative matrix sum`
+`HRcuanmerging= Cuantitative matrix sum`
+`HRgtmerging = Grand Total Standarization`
+`HRminmaxmerging = Min-max scaled matrix`
+
+### Empirical, observed matrices
+#### Mist-netting
+
+```{r M_mn}
+M_mn <- computeModules(mn, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+M_mn@likelihood
+# Msig(mn, M_bc@likelihood)
+
+# m_boot(mn, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_mn@likelihood
+
+HR_MN_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot<-m_boot(mn, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+HR_MN_Mboot<- cbind(HR_MN_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*HR_MN_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*HR_MN_Mboot$rnd.se)
+# ci1 <-  apply(m.boot,2,mean)-(1.962*HR_MN_Mboot$rnd.se)
+# ci2 <-  apply(m.boot,2,mean)+(1.962*HR_MN_Mboot$rnd.se)
+
+HR_MN_Mboot<- cbind(HR_MN_Mboot, ci1, ci2)
+colnames(HR_MN_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HR_MN_Mboot
+
+```
+
+
+#### Direct observations (spot-census along transects)
+
+```{r M_obs}
+M_CENSUS <- computeModules(obs, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+M_CENSUS@likelihood
+# Msig(obs, M_cam@likelihood)
+# m_boot(obs, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_CENSUS@likelihood
+
+HR_CENSUS_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot<-m_boot(obs, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+HR_CENSUS_Mboot<- cbind(HR_CENSUS_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*HR_CENSUS_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*HR_CENSUS_Mboot$rnd.se)
+# ci1 <-  apply(m.boot,2,mean)-(1.962*HR_CENSUS_Mboot$rnd.se)
+# ci2 <-  apply(m.boot,2,mean)+(1.962*HR_CENSUS_Mboot$rnd.se)
+
+HR_CENSUS_Mboot<- cbind(HR_CENSUS_Mboot, ci1, ci2)
+colnames(HR_CENSUS_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HR_CENSUS_Mboot
+
+```
+
+### Merged matrices
+#### Cualitative matrix sum
+
+```{r M_HRcualmerging, warning=FALSE}
+M_HRcualmerging <- computeModules(HRcualmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_HRcualmerging@likelihood
+# Msig(HRcualmerging, M_HRcualmerging@likelihood)
+
+# m_boot(HRcualmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_HRcualmerging@likelihood
+
+HRcualmerging_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot<-m_boot(HRcualmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+HRcualmerging_Mboot<- cbind(HRcualmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*HRcualmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*HRcualmerging_Mboot$rnd.se)
+# ci1 <-  apply(m.boot,2,mean)-(1.962*HRcualmerging_Mboot$rnd.se)
+# ci2 <-  apply(m.boot,2,mean)+(1.962*HRcualmerging_Mboot$rnd.se)
+
+HRcualmerging_Mboot<- cbind(HRcualmerging_Mboot, ci1, ci2)
+colnames(HRcualmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRcualmerging_Mboot
+
+```
+
+
+#### Cuantitative matrix sum
+
+```{r M_HRcuanmerging, warning=FALSE}
+M_HRcuanmerging <- computeModules(HRcuanmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_HRcuanmerging@likelihood
+# Msig(HRcuanmerging, M_HRcuanlmerging@likelihood)
+
+# m_boot(HRcuanmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_HRcuanmerging@likelihood
+HRcuanmerging_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									 colMeans(m.boot <- m_boot(HRcuanmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+HRcuanmerging_Mboot<- cbind(HRcuanmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*HRcuanmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*HRcuanmerging_Mboot$rnd.se)
+# ci1 <-  apply(m.boot,2,mean)-(1.962*HRcuanmerging_Mboot$rnd.se)
+# ci2 <-  apply(m.boot,2,mean)+(1.962*HRcuanmerging_Mboot$rnd.se)
+
+HRcuanmerging_Mboot <- cbind(HRcuanmerging_Mboot, ci1, ci2)
+colnames(HRcuanmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRcuanmerging_Mboot
+
+```
+
+
+#### Grand Total Standarization
+
+```{r M_HRgtmerging, warning=FALSE}
+M_HRgtmerging <- computeModules(HRgtmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_HRgtmerging@likelihood
+# Msig(HRgtmerging, M_HRcualmerging@likelihood)
+
+# m_boot(HRgtmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_HRgtmerging@likelihood
+HRgtmerging_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+								   colMeans(m.boot<- m_boot(HRgtmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+HRgtmerging_Mboot<- cbind(HRgtmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*HRgtmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*HRgtmerging_Mboot$rnd.se)
+# ci1 <-  apply(m.boot,2,mean)-(1.962*HRgtmerging_Mboot$rnd.se)
+# ci2 <-  apply(m.boot,2,mean)+(1.962*HRgtmerging_Mboot$rnd.se)
+
+
+HRgtmerging_Mboot<- cbind(HRgtmerging_Mboot, ci1, ci2)
+colnames(HRgtmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRgtmerging_Mboot
+
+```
+
+
+#### Min-max scaled matrix
+
+```{r M_HRminmaxmerging, warning=FALSE}
+M_HRminmaxmerging <- computeModules(HRminmaxmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_HRminmaxmerging@likelihood
+# Msig(HRminmaxmerging, M_HRcualmerging@likelihood)
+
+# m_boot(HRminmaxmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_HRminmaxmerging@likelihood
+HRminmaxmerging_Mboot <- as.data.frame(cbind(MObs, # colMeans(m.boot)))
+									   colMeans(m.boot<-m_boot(HRminmaxmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+HRminmaxmerging_Mboot<- cbind(HRminmaxmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*HRminmaxmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*HRminmaxmerging_Mboot$rnd.se)
+# ci1 <-  apply(m.boot,2,mean)-(1.962*HRminmaxmerging_Mboot$rnd.se)
+# ci2 <-  apply(m.boot,2,mean)+(1.962*HRminmaxmerging_Mboot$rnd.se)
+
+HRminmaxmerging_Mboot<- cbind(HRminmaxmerging_Mboot, ci1, ci2)
+colnames(HRminmaxmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRminmaxmerging_Mboot
+
+```
+
+
+------------------------------------------------------------------------------
+
+```{r session, echo=T}
+sessionInfo()
+
+```
+
+
+

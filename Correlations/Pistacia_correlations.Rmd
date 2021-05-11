@@ -1,0 +1,303 @@
+---
+title: "Pistacia correlations"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, warning=F, message=F}
+library(tidyverse)
+library(tibble)
+library(RColorBrewer)
+library(gridExtra)
+library(ggplot2)
+library(ggpubr)
+```
+
+Read data
+
+```{r}
+bc <- read.csv("../Case_studies_datasets/pl_bc_clean.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+cam <- read.csv("../Case_studies_datasets/pl_cam_clean.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+QC <- read.csv("../Data_merging/Pistacia_QC.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+QS <- read.csv("../Data_merging/Pistacia_QS.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+GTS <- read.csv("../Data_merging/Pistacia_GTS.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+MMS <- read.csv("../Data_merging/Pistacia_MMS.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+SES <- read.csv("../Data_merging/Pistacia_SES.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+```
+
+Apply long format to matrices
+
+```{r matrices to lists, include=F}
+BC.long<- bc %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.bc")
+
+CAM.long<- cam %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.cam")
+
+QC.long<- QC %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.qc")
+
+QS.long<- QS %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.qs")
+
+GTS.long<- GTS %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.gts")
+
+MMS.long<- MMS %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.mms")
+
+SES.long<- SES %>% 
+  rownames_to_column(var="plant_id")%>%
+  pivot_longer(-plant_id, names_to = "disperser", values_to = "visits.ses")
+```
+
+Combine all merging methods together in a single dataset and calculate a Coefficient of Variation for 'Standardizing' methods
+
+```{r, include=F}
+all.long <- right_join(BC.long, CAM.long)%>%
+  right_join(QC.long) %>%
+  right_join(QS.long) %>% 
+  right_join(GTS.long) %>% 
+  right_join(MMS.long) %>% 
+  right_join(SES.long) %>%
+  dplyr::rowwise() %>% mutate(SD=sd(c(visits.gts,visits.mms,visits.ses)), MEAN=mean(c(visits.gts,visits.mms,visits.ses)), CV=SD/MEAN)
+```
+
+## COMPARE BETWEEN QUANTITATIVE METHODS
+
+```{r comparing between methods, warning=F, message=F, echo=F}
+QS_GTS <- ggplot(data=all.long, aes(x=(visits.qs), y=(visits.gts)))+geom_point()+
+  theme_bw()+xlab(" QS")+ylab(" GTS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+QS_MMS <- ggplot(data=all.long, aes(x=(visits.qs), y=(visits.mms)))+geom_point()+
+  theme_bw()+xlab(" QS")+ylab(" MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+GTS_MMS <- ggplot(data=all.long, aes(x=(visits.gts), y=(visits.mms)))+geom_point()+
+  theme_bw()+xlab(" GTS")+ylab(" MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+SES_QS <- ggplot(data=all.long, aes(x=(visits.ses), y=(visits.qs)))+geom_point()+
+  theme_bw()+xlab(" SES")+ylab(" QS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+SES_GTS <- ggplot(data=all.long, aes(x=(visits.ses), y=(visits.gts)))+geom_point()+
+  theme_bw()+xlab(" SES")+ylab(" GTS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+SES_MMS <- ggplot(data=all.long, aes(x=(visits.ses), y=(visits.mms)))+geom_point()+
+  theme_bw()+xlab(" SES")+ylab(" MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+
+grid.arrange(QS_GTS, QS_MMS, GTS_MMS, SES_QS, SES_GTS, SES_MMS, ncol=3, nrow=2, top="QS, GTS, MMS and SES method correlation")
+```
+
+Now with data log-transformed to control for 0 inflated matrices.
+
+```{r comparing between methods 2, warning=F, message=F, echo=F}
+QS_GTS <- ggplot(data=all.long, aes(x=log(visits.qs), y=log(visits.gts)))+geom_point()+
+  theme_bw()+xlab("log QS")+ylab("log GTS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+QS_MMS <- ggplot(data=all.long, aes(x=log(visits.qs), y=log(visits.mms)))+geom_point()+
+  theme_bw()+xlab("log QS")+ylab("log MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+GTS_MMS <- ggplot(data=all.long, aes(x=log(visits.gts), y=log(visits.mms)))+geom_point()+
+  theme_bw()+xlab("log GTS")+ylab("log MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+SES_QS <- ggplot(data=all.long, aes(x=log(visits.ses), y=log(visits.qs)))+geom_point()+
+  theme_bw()+xlab("log SES")+ylab("log QS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+SES_GTS <- ggplot(data=all.long, aes(x=log(visits.ses), y=log(visits.gts)))+geom_point()+
+  theme_bw()+xlab("log SES")+ylab("log GTS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+SES_MMS <- ggplot(data=all.long, aes(x=log(visits.ses), y=log(visits.mms)))+geom_point()+
+  theme_bw()+xlab("log SES")+ylab("log MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+geom_smooth(color="#0570b0", size=0.5)
+
+grid.arrange(QS_GTS, QS_MMS, GTS_MMS, SES_QS, SES_GTS, SES_MMS, ncol=3, nrow=2, top="QS, GTS, MMS and SES method correlation")
+```
+
+-   **All correlations showed in the graphs are kendall's tau (based in ranking for non-parametric data).**
+-   Here we see how the different merging methods are (dis)similar to each other.
+-   MMS and QS are the most similar ones.
+-   SES method is most similar to a GTS, and less to QS.
+-   GTS has also very similar results to MMS.
+
+### METHODS CORRELATIONS
+
+```{r cors}
+pearson <- cor(x=all.long[,c(3,4,6:9)], method = "pearson")
+
+kendall <- cor(x=all.long[,c(3,4,6:9)], method = "kendall")
+```
+
+Correlation plot:
+
+```{r cors 2}
+library(corrplot)
+library(RColorBrewer)
+
+col <- colorRampPalette(c("white", "white","white", "white","white", "white", "white",  "white", "white","#D9EF8B","#A6D96A","#66BD63"))
+
+col2 <- colorRampPalette(c("white", "white","white", "white","white", "white", "white",  "white", "white","#edf8b1","#7fcdbb","#2c7fb8"))
+
+corrplot(pearson,method = "color",type="upper",number.cex = .7,addCoef.col="black", tl.col = "black", col=col2(40), title="Pearson UP vs Kendall DOWN", tl.pos = "d",tl.srt = 45, cl.pos = "n")
+
+corrplot(kendall, method = "color",type="lower",number.cex = .7,addCoef.col=T, tl.col = "black",  col=col2(40),diag = FALSE, tl.pos = "n", cl.pos = "n",add=T)
+```
+
+```{r, include=F}
+# #with confidence intervals
+# library(psych)
+# cor.ci(x=all.long[,c(3,4,6:9)], method = "pearson")
+# cor.ci(x=all.long[,c(3,4,6:9)], method = "kendall")
+# f<-cor.plot.upperLowerCi(e)
+```
+
+### COMPARING METHODOLOGIES WITH MERGING METHODS
+
+*Number of registers for each methodology*
+
+DNA-Barcoding:
+
+```{r, echo=F}
+sum(bc)
+```
+
+GoPro cameras:
+
+```{r, echo=F}
+sum(cam)
+```
+
+Here we observe the relationship between the 2 methodologies used in the field: Barcoding and cams is very little correlated.
+
+```{r compare cams and bc, echo=F, warning=F, message=F}
+BC_CAM <- ggplot(data=all.long, aes(x=visits.bc, y=visits.cam))+geom_point()+
+  theme_bw()+xlab("DNA-Barcoding")+ylab("GoPro Cameras")+
+  geom_smooth(method=lm, color="#0570b0", size=0.5)+
+  stat_cor(aes(label = ..r.label..), method="kendall")+ 
+  labs(title="Methodology comparision (BC vs. CAMs)")
+BC_CAM
+```
+
+```{r, echo=F}
+# log_BC_CAM <- ggplot(data=all.long, aes(x=log(visits.bc), y=log(visits.cam)))+geom_point()+
+#   theme_bw()+xlab("log DNA-Barcoding")+ylab("log GoPro Cameras")+
+#   geom_smooth(color="violetred4", size=0.5)+ geom_smooth(method=lm, color="violetred1", size=0.5)+
+#   stat_cor(aes(label = ..r.label..), method="kendall")+ 
+#   labs(title="Methodology comparision (BC vs. CAMs)")
+# log_BC_CAM
+```
+
+This plot trendline shows how the highest values for cameras are not so high in barcoding, probably because cams detect in higher freq the most common frugivores (E. rub and S. mel), the force the trend to go upsteep. Rare species could also be pulling the trend towards the x axis (since they are only detectable in barcoding), yet, these are much fewer interactions, not likely affecting the final trend.
+
+### How well each "merging method" values the different two methodologies
+
+#### QUANTITATIVE SUM (QS)
+
+```{r comparing within methods 1, warning=F, message=F}
+QS_BC <- ggplot(data=all.long, aes(x=visits.qs, y=visits.bc))+geom_point()+
+  theme_bw()+ylab("DNA-Barcoding")+xlab("QS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+QS_CAM <- ggplot(data=all.long, aes(x=visits.qs, y=visits.cam))+geom_point()+
+  theme_bw()+ylab("GoPro")+xlab("QS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(QS_BC, QS_CAM, ncol=2, top="How QS merging treats each metholodgy")
+```
+
+#### Grand Total Standarization (GTS)
+
+```{r comparing within methods 2, warning=F, message=F, echo=F}
+gts_BC <- ggplot(data=all.long, aes(x=visits.gts, y=visits.bc))+geom_point()+
+  theme_bw()+ylab("DNA-Barcoding")+xlab("GTS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+gts_CAM <- ggplot(data=all.long, aes(x=visits.gts, y=visits.cam))+geom_point()+
+  theme_bw()+ylab("GoPro")+xlab("GTS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(gts_BC, gts_CAM, ncol=2, top="How GTS merging treats each metholodgy")
+```
+
+#### MIN-MAX SCALING (MMS)
+
+```{r comparing within methods 3, warning=F, message=F, echo=F}
+mms_BC <- ggplot(data=all.long, aes(x=visits.mms, y=visits.bc))+geom_point()+
+  theme_bw()+ylab("DNA-Barcoding")+xlab("MMS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+mms_CAM <- ggplot(data=all.long, aes(x=visits.mms, y=visits.cam))+geom_point()+
+  theme_bw()+ylab("GoPro")+xlab("MMS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(mms_BC, mms_CAM, ncol=2, top="How MMS merging treats each metholodgy")
+```
+
+#### Standarize base on SAMPLING EFFORT (SES)
+
+```{r comparing within methods 4, warning=F, message=F, echo=F}
+ses_BC <- ggplot(data=all.long, aes(x=visits.ses, y=visits.bc))+geom_point()+
+  theme_bw()+ylab("DNA-Barcoding")+xlab("SES")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+ylim(-1,40)
+
+ses_CAM <- ggplot(data=all.long, aes(x=visits.ses, y=visits.cam))+geom_point()+
+  theme_bw()+ylab("GoPro")+xlab("SES")+
+  geom_smooth(color="#0570b0", size=0.5)+ylim(-1,30)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(ses_BC, ses_CAM, ncol=2, top="How SES merging treats each metholodgy")
+```
+
+SUMMARY:
+
+-   All methods show a higher Kendall's correlation with the barcoding data, indicating a higher accordance with DNA-Barcoding (probably because it has many more interactions, 1162 vs. 397).
+
+-   Yet, GTS and SES methods gave higher correlation to cameras than QS and MMS, decreasing the weight of the barcoding data; indicating more accordance with camera data. I think this might be an effect of GTS and SES putting both methods at the same level (giving them a similar weight to both) by considering a similar sampling effort for both methods.
+
+-   GTS does this by referring interactions to the total of registers. And SES by referring all interactions to the same units, regardless they have been more or less sampled.
+
+-   For SES standardization, regarding time, barcoding data is less valued, since they have been recording for around 1300 hours (and would need to divide the interaction by that big number of hours) vs cameras that just have recorded a mean of 2.11 hours. Yet, regarding area, DNA-barcoding is more valued, since it has recorded around 1% of the plant and the cameras have recorded a 50% (barcoding interactions would be multiplied by 100 to refer it to whole plant, while cameras only by 2). These differences in time and area correction, make in the end having higher correction factor for interactions in cameras than in barcoding.

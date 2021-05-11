@@ -1,0 +1,469 @@
+---
+title: "Network indices confidence intervals - Hato Ratón"
+author: "Pedro Jordano"
+date: "11/17/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Matrices
+
+Final matrix Names:
+
+`mn = Original mist-netting matrix from HR`
+
+`obs = Original censuses matrix from HR`
+
+`HRcualmerging = Cualitative matrix sum`
+
+`HRcuanmerging = Cuantitative matrix sum`
+
+`HRgtmerging = Grand Total Standarization`
+
+`HRminmaxmerging = Min-max scaled matrix`
+
+
+```{r}
+# Load matrices
+getwd()
+hr.mn<- read.csv("../Case_studies_datasets/hr_mn_clean.csv",header=T,sep=",",dec=".")
+hr.obs<- read.csv("../Case_studies_datasets/hr_obs_clean.csv",header=T,sep=",",dec=".")
+
+# Convert all interactions in numeric
+mn <- hr.mn%>%column_to_rownames(var="AASPECIES")
+#as.data.frame(lapply(hr.mn, as.numeric))
+
+obs <- hr.obs%>%column_to_rownames(var="AASPECIES")
+#as.data.frame(lapply((pl.cam),hr.obs, as.numeric))
+```
+
+
+```{r}
+#Qualitative combination
+HRcuanmerging <- mn+obs
+HRcualmerging=HRcuanmerging
+HRcualmerging[HRcuanmerging!=0]=1
+
+#Quantitative sum
+HRcuanmerging <- mn+obs
+
+# Grand total
+mn.gts<- mn/sum(mn)
+obs.gts<- obs/sum(obs)
+HRgtmerging<- (mn.gts+obs.gts)/2
+sum(HRgtmerging)
+
+# Min-Max scaling
+mn.mms<- (mn-min(mn))/(max(mn)-min(mn))
+obs.mms<- (obs-min(obs))/(max(obs)-min(obs))
+HRminmaxmerging<- (mn.mms+obs.mms)/2
+```
+
+## Bootstrap estimates of network parameters
+
+We estimate the confidence intervals by resampling the five adjacency matrices
+obtained from the different methods and computing their average, SE, and CIs.
+
+
+### Cualitative matrix sum
+
+```{r CIs_HRcualmerging}
+#
+# HRcualmerging = Cualitative matrix sum
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- HRcualmerging
+HRobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+HRcualmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+HRcualmerging_boot<- cbind(HRcualmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*HRcualmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*HRcualmerging_boot$rnd.se))
+ci1 <-  HRobs-(1.962*HRcualmerging_boot$rnd.se)
+ci2 <-  HRobs+(1.962*HRcualmerging_boot$rnd.se)
+
+HRcualmerging_boot<- cbind(HRcualmerging_boot, ci1, ci2)
+colnames(HRcualmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+HRcualmerging_boot<- cbind(HRobs,HRcualmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRcualmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+### Cuantitative matrix sum
+
+```{r CIs_HRcuanmerging}
+#
+# HRcuanmerging = Cuantitative matrix sum
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- HRcuanmerging
+HRobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   		  "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+HRcuanmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+HRcuanmerging_boot<- cbind(HRcuanmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*HRcuanmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*HRcuanmerging_boot$rnd.se))
+ci1 <-  HRobs-(1.962*HRcuanmerging_boot$rnd.se)
+ci2 <-  HRobs+(1.962*HRcuanmerging_boot$rnd.se)
+
+HRcuanmerging_boot<- cbind(HRcuanmerging_boot, ci1, ci2)
+colnames(HRcuanmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+HRcuanmerging_boot<- cbind(HRobs,HRcuanmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRcuanmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+### Grand Total Standardization
+
+```{r CIs_HRgtmerging}
+#
+# HRgtmerging = Grand Total Standardization
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- HRgtmerging
+HRobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		 "NODF",
+    									   		 "weighted NODF",
+    							 	   		     "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+HRgtmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+HRgtmerging_boot<- cbind(HRgtmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*HRgtmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*HRgtmerging_boot$rnd.se))
+ci1 <-  HRobs-(1.962*HRgtmerging_boot$rnd.se)
+ci2 <-  HRobs+(1.962*HRgtmerging_boot$rnd.se)
+
+HRgtmerging_boot<- cbind(HRgtmerging_boot, ci1, ci2)
+colnames(HRgtmerging_boot)<- c("mean.boot", "SE", 
+							   "CI_low", "CI_high")
+
+HRgtmerging_boot<- cbind(HRobs,HRgtmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRgtmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+
+```
+
+### Min-max scaled matrix
+
+```{r CIs_HRminmaxmerging}
+#
+# HRminmaxmerging = Min-max scaled matrix
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- HRminmaxmerging
+HRobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+HRminmaxmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+HRminmaxmerging_boot<- cbind(HRminmaxmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*HRminmaxmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*HRminmaxmerging_boot$rnd.se))
+ci1 <-  HRobs-(1.962*HRminmaxmerging_boot$rnd.se)
+ci2 <-  HRobs+(1.962*HRminmaxmerging_boot$rnd.se)
+
+HRminmaxmerging_boot<- cbind(HRminmaxmerging_boot, ci1, ci2)
+colnames(HRminmaxmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+HRminmaxmerging_boot<- cbind(HRobs,HRminmaxmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRminmaxmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+### MIST-NETTING MATRIX
+
+```{r CIs_HR.mist-netting}
+#
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- mn
+HRobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+HRMNmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+HRMNmerging_boot<- cbind(HRMNmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*HRminmaxmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*HRminmaxmerging_boot$rnd.se))
+ci1 <-  HRobs-(1.962*HRMNmerging_boot$rnd.se)
+ci2 <-  HRobs+(1.962*HRMNmerging_boot$rnd.se)
+
+HRMNmerging_boot<- cbind(HRMNmerging_boot, ci1, ci2)
+colnames(HRMNmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+HRMNmerging_boot<- cbind(HRobs,HRMNmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HRMNmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+
+### OBSERVATION MATRIX
+
+```{r CIs_HR.observation}
+#
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- obs
+HRobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+HROBS_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+HROBS_boot<- cbind(HROBS_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*HRminmaxmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*HRminmaxmerging_boot$rnd.se))
+ci1 <-  HRobs-(1.962*HROBS_boot$rnd.se)
+ci2 <-  HRobs+(1.962*HROBS_boot$rnd.se)
+
+HROBS_boot<- cbind(HROBS_boot, ci1, ci2)
+colnames(HROBS_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+HROBS_boot<- cbind(HRobs,HROBS_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+HROBS_boot
+```

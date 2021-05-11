@@ -1,0 +1,43 @@
+cla;ord;fam;gen;sp.;totvis;ce01;ce02;ce03;ce04;ce05;ce06;ce07;ce08;ce09;ce010;ce011;ce012;ce013;ce014;ce015;ce016;ce017;ce018;ce019;ce020;ce021;ce022;ce023;ce024;ce025;ce026;ce027;ce028
+Aves;Passeriformes;Thraupidae;Tangara ;cyanocephala;7;3;0;0;0;0;0;0;0;0;0;4;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Thraupis ;ornata;127;1;21;14;4;11;9;6;2;4;0;0;0;4;1;6;6;0;9;1;0;6;7;4;2;7;0;0;2
+Aves;Passeriformes;Coerebidae;Coereba;flaveola;26;2;0;1;0;1;0;0;0;0;0;0;2;3;0;0;4;1;6;0;0;1;0;0;0;2;0;0;3
+Aves;Passeriformes;Thraupidae;Thraupis ;palmarum;29;4;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;25;0;0;0
+Aves;Passeriformes;Thraupidae;Tachyphonus;coronatus;4;2;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;1;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Thraupis ;cyanoptera;13;0;6;2;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;2;0;2;0;0;0;0;0
+Aves;Passeriformes;Icteridae;Cacicus;chrysopterus;7;0;5;2;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Fringillidae;Euphonia ;violacea;1;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Fringillidae;Euphonia ;chalybea;8;0;1;1;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;2;1;2;0;0;0;0
+Aves;Trogoniformes;Trogonidae;Trogon ;viridis;4;0;1;0;0;0;0;0;0;0;0;0;0;3;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Chlorophanes;spiza;2;0;1;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Psittaciformes;Psittacidae;Pyrrhura;frontalis;34;0;1;1;0;0;0;0;0;0;0;18;0;5;0;1;1;3;4;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Cissopis ;leverianus;15;0;0;1;0;1;4;0;0;3;0;0;0;0;0;0;0;0;0;1;1;1;0;0;0;0;1;0;3
+Aves;Piciformes;Picidae;Melanerpes;flavifrons;26;0;0;0;6;4;13;0;0;1;1;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Psittaciformes;Psittacidae;Forpus ;xanthopterygius;19;0;0;0;6;0;10;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;2;0;0;0;0;0
+Aves;Passeriformes;Turdidae;Turdus;rufiventris;2;0;0;0;0;0;1;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Vireonidae;Cyclarhis;gujanensis;2;0;0;0;0;1;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Psittaciformes;Psittacidae;Brotogeris;tirica;32;0;0;0;0;0;4;0;0;0;0;0;0;3;0;2;0;0;4;0;0;0;16;2;1;0;0;0;0
+Aves;Passeriformes;Fringillidae;Euphonia ;cyanocephala;1;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Trogoniformes;Trogonidae;Trogon ;surrucura;1;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Dacnis;nigripes;4;0;0;0;0;0;0;0;0;0;0;4;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Psittaciformes;Psittacidae;Pionus ;maximiliani;2;0;0;0;0;0;0;0;0;0;0;2;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Galliformes;Cracidae;Aburria;jacutinga;1;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Turdidae;Turdus ;flavipes;8;0;0;0;0;0;0;0;0;0;0;0;0;3;2;0;0;0;0;0;0;1;2;0;0;0;0;0;0
+Aves;Coraciiformes;Momotidae;Baryphthengus ;ruficapillus;1;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Tangara ;desmaresti;2;0;0;0;0;0;0;0;0;0;0;0;0;1;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Hemithraupis ;ruficapilla;1;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Saltator;similis;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Dacnis;sp.;3;0;0;0;0;0;0;0;0;0;0;0;0;0;0;3;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Piciformes;Ramphastidae;Selenidera;maculirostris;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Tangara ;seledon;10;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;2;2;4;0;0;0;0;0;0;0;0;0;2
+Aves;Passeriformes;Thraupidae;Chlorophonia;cyanea;15;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;2;0;4;0;0;0;0;0;0;0;0;0;9
+Aves;Passeriformes;Tityridae;Tityra ;inquisitor;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0;0;0;0;0
+Aves;Passeriformes;Thraupidae;Dacnis;cayana;2;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;1;0;0;0;0
+Aves;Passeriformes;Thraupidae;Tangara ;preciosa;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0
+Aves;Passeriformes;Tityridae;Tityra ;cayana;1;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;0;0
+Aves;Passeriformes;Thraupidae;Orthogonys;chloricterus;2;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;2;0;0;0;0
+Aves;Piciformes;Ramphastidae;Pteroglossus;bailloni;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Piciformes;Ramphastidae;Ramphastos;dicolorus;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Aves;Indet;Indet;Indet;Indet;19;1;0;0;0;0;0;0;0;0;0;2;0;2;0;0;0;0;0;2;5;0;0;0;0;7;0;0;0
+Mammalia;Primates;Cebidae;Brachyteles ;arachnoides;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0
+Mammalia;Primates;Cebidae;Cebus ;nigritus;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0

@@ -1,0 +1,209 @@
+---
+title: "Interaction Accumulation Curves"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+Here we present four examples for the computation of Interactions Accumulation Curves (IAC) present in Figure 2 of the manuscript.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, message=F, warning=F, include=F}
+library(tidyverse)
+library(fossil)
+library(vegan)
+library(knitr)
+suppressPackageStartupMessages(library(tidylog))
+library(summarytools)
+```
+
+### A. FOCAL OBSERVATIONS
+
+Example of the frugivory assemblage of *Cecropia glaziovii* individual plants at Intervales Park (Sao Paulo, Brasil). Data obtained during frugivory course (Pedro Jordano, Marco Aurelio Pizo, Mauro Galetti).
+
+```{r}
+f.obs_raw <- read.csv ("data/Cecropia_data.csv", header = T, sep=";",)
+```
+
+Create variable named 'species' by pasting genera and species; and remove undetermined species
+
+```{r}
+f.obs <- f.obs_raw %>%
+  dplyr::mutate(species = paste0(gen,".", sp.)) %>%
+  dplyr::filter(gen!= "Indet")
+```
+
+Obtain observation matrix where each row represents one individual of *Cecropia*, and frugivores are presented in columns.
+
+```{r}
+cecropia.obs <- as.data.frame(t(f.obs[,7:34])) %>% `colnames<-`(f.obs$species)
+```
+
+**Sampling effort:** There were 28 individual plants that were observed for continuous 5 hours on the same day.
+
+```{r}
+#Generate sampling effort list
+cecropia.samp.eff= rep(5,28)
+```
+
+Obtain Species Richness estimators: Chao, first order Jack knife, second order Jack knife and Bootstrap with their respective SE.
+
+```{r}
+kable(specpool(cecropia.obs))
+```
+
+where "Species" indicates the number of species encountered (in this case 37 frugivore species), and "n" indicates the number of sampling effort units (in this case 12 *Cecropia* individuals).
+
+IAC curve:
+
+```{r IAC_focal_observations}
+curve_f.obs <- specaccum(cecropia.obs, method="random", permutations=100, w=cecropia.samp.eff, effort=5)
+
+plot(curve_f.obs, ci.type="polygon", xvar = "effort",lwd=2, ci.lty=0,
+     ci.col= rgb(116/255,169/255,207/255,.6), ylab= "Interaction richness", 
+     xlab="Observation time (h/plant)", main="Focal Observations")
+
+```
+
+### B. CAMERA TRAPS
+
+Example of frugivory assemblage at three *Juniperus phoenicia* forest stands in Doñana Natural Reserve (Huelva, Spain). Data from Jorge Isla's PhD Thesis.
+
+```{r}
+cam_raw <- read.csv("data/Juniperus_cams.csv", header = T, sep=";")
+```
+
+Filter data by exclusive "feeding" behavior, and summarize data by area, fortnight and species detected.
+```{r, message=F}
+cam <- cam_raw %>%
+  dplyr::filter(behavior=="FEEDING") %>%
+  dplyr::group_by(area, fortnight, sp, ) %>%
+  dplyr::summarise(n_interactions=n())
+```
+
+Convert to observation matrix where each row represent one fortnight of data collection in each one of the areas. Columns indicate frugivore species detected.
+
+```{r convert to observation matrix sab}
+sab_obs<-cam %>%
+  tidyr::pivot_wider(names_from= sp, values_from= n_interactions, 
+                     values_fill= list(count= 0)) %>%
+  replace(is.na(.), 0)
+```
+
+**Sampling effort:** Cameras traps (n=X?) were revised every 15 days in each area
+```{r}
+#Generate sampling effort list
+juniperus_samp_eff <- rep(15,83)
+```
+
+Obtain Species Richness estimators:
+```{r general curve sab}
+kable(specpool(sab_obs[,-c(1:2)],sab_obs$area))
+```
+
+where "Species" indicates the number of species encountered (in this case 14, 10 and 11 frugivore species for each *Juniperus* stand), and "n" indicates the number of sampling effort units (28, 28 and 27 fortnights in each *Juniperus* stand).
+
+IAC curve:
+```{r IAC_camera_traps}
+curve_cam <- specaccum(sab_obs[,-c(1:2)], method="random", permutations=100, effort=15, w=juniperus_samp_eff)
+
+plot(curve_cam, ci.type="polygon",col="#555555", lwd=2, ci.lty=0, 
+     ci.col= rgb(116/255,169/255,207/255,.6), ylab="Interaction richness", 
+     xvar = "effort",
+     xlab="Cameras working time in days", main="Camera Traps")
+```
+
+### C. AVIAN MIST-NETTING
+
+Example of frugivory assemblage at Hato Ratón in Doñana National Park (Huelva, Spain) from diet samples obstained from mist-netted birds between 1980-1983. Data from Pedro Jordano's PhD Thesis.
+
+```{r}
+mist.net_raw <- read.csv("data/Interactions_HR_1980.csv", sep=";")
+```
+
+Give a unique ID number for each bird capture, calculate total number of seeds per bird species and give a unique name for each sp-sp pairwise interaction.
+```{r}
+mist.net <- mist.net_raw %>%
+            dplyr::mutate(sample=row_number()) %>% 
+            tidyr::pivot_longer(cols=4:20,names_to = "disperser", 
+                                values_to= "count") %>% 
+            dplyr::mutate(interaction= paste(SPECIES,disperser))
+```
+
+Convert to observation matrix where each row represents a bird captured (*i.e.*, a diet sample), and columns represent avian frugivores.
+
+```{r}
+mist.net <- mist.net %>% 
+           tidyr::pivot_wider(id_cols=sample, names_from = interaction, 
+                              values_from= count, 
+                              values_fill= list(count= 0), 
+                              names_repair= "unique")
+```
+
+**Sampling effort:** there was a total of 1808 birds captured of which 374 did not have fruits/seed in their diet.
+
+Obtain Interactions richness estimators:
+```{r}
+kable(specpool(mist.net[,-1]))
+```
+
+where "Species" indicates the number of **interactions** encountered (in this case 125 unique frugivore-plant pariwise interactions), and "n" indicates the number of sampling effort units (in this case 1808 diet samples).
+
+IAC curve:
+```{r IAC_avian_mist_netting}
+curve_mist.net <- specaccum(mist.net[,-1], method="random",permutations=100)
+
+plot(curve_mist.net, ci.type="polygon",col="#555555", lwd=2, ci.lty=0, 
+      ci.col= rgb(116/255,169/255,207/255,.6), ylab="Interaction richness", 
+      xlab="Number of birds captured", main="Avian mist-netting")
+```
+
+### D. DNA-Barcoding
+
+Example for frugivory assemblage of *Pistacia lentiscus* individual plants in La Mancha del Rabicano, El Puntal in Doñana National Park (Huelva, Spain). Data from Elena Quintero's PhD Thesis.
+
+```{r}
+dna.bc_raw <- read.csv("data/Pistacia_barcoding_winter.csv", header = T, sep=",",) 
+```
+
+Convert to observation matrix where each row represent a individual sample analyzed (*i.e.*, fecal sample or regurgitated seed), and columns represent avian frugivores.
+```{r}
+dna.bc <- dna.bc_raw %>%
+   dplyr::select(-X) %>%
+   tidyr::pivot_wider(names_from = disperser, values_from = priority, 
+                      values_fill= list(priority= 0))
+```
+
+Obtain Species Richness Estimators
+```{r}
+kable(specpool(dna.bc[,-c(1,2)]))
+```
+
+where "Species" indicates the number of species encountered (in this case 16 frugivore species), and "n" indicates the number of sampling effort units (in this case 1072 fecal/seed samples collected in seed traps settled under *Pistacia lentiscus* individuals).
+
+IAC curve:
+```{r IAC_DNA_barcoding}
+curve_pun <- specaccum(dna.bc[,-c(1,2)], method="random",permutations=100)
+
+plot(curve_pun, ci.type="polygon",col="#555555", lwd=2, ci.lty=0, 
+     ci.col=rgb(116/255,169/255,207/255,.6), ylab="Interaction richness", 
+     xlab="Number of samples analyzed", main="DNA-barcoding")
+```
+
+------------------------------------------------------------------------
+
+```{r session, echo= FALSE}
+#-------------------------------------------------------------------------------
+# In Rmd: 
+# Last update: 
+
+cat("Last update: ", format(Sys.time(), "%a %b %d %X %Y"), "\n", "\n")
+
+# Session
+sessionInfo()
+#-------------------------------------------------------------------------------
+
+```

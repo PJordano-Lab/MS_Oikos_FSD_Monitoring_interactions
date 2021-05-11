@@ -1,0 +1,396 @@
+---
+title: "CIs-Modularity_El Puntal"
+author: "Pedro Jordano"
+date: "11/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Matrices
+
+Final matrix Names:
+
+`bc = Original Barcoding matrix from Pistacia lentiscus`   
+`cualmerging = Cualitative matrix sum`        
+`cuanmerging = Cuantitative matrix sum`          
+`gtmerging = Grand Total Standarization`         
+`minmaxmerging = Min-max scaled matrix`            
+`seffortmerging = Sampling effort merging by mean among standardized matrices.`       
+
+
+```{r load-data}
+# Load matrices
+
+pl.bc<- read.csv("../Case_studies_datasets/pl_bc_clean.csv",header=T,sep=",",dec=".")
+pl.cam<- read.csv("../Case_studies_datasets/pl_cam_clean.csv",header=T,sep=",",dec=".")
+
+# Convert all interactions in numeric
+bc <- as.data.frame(lapply(pl.bc, as.numeric))%>% 
+	column_to_rownames(var="X")
+# ??column_to_rownames
+cam <- as.data.frame(lapply(pl.cam, as.numeric)) %>% 
+	        column_to_rownames(var="X")
+
+# Qualitative combination
+PUNcuanmerging<- bc+cam
+PUNcualmerging= PUNcuanmerging
+PUNcualmerging[PUNcuanmerging!= 0]= 1
+
+# Quantitative sum
+PUNcuanmerging<- bc+cam
+
+# Grand total
+bct<- bc/sum(bc)
+camt<- cam/sum(cam)
+PUNgtmerging<- (bct+camt)/2
+
+# Min-Max scaling
+bct<- (bc-min(bc))/(max(bc)-min(bc))
+camt<- (cam-min(cam))/(max(cam)-min(cam))
+PUNminmaxmerging<- (bct+camt)/2
+
+# Sampling effort standardization
+bceff<- read.csv("../../Data/pistacia/bc_sampling_effort.csv",header=T,sep=";",dec=".", comment.char = "#")
+cameff<- read.csv("../../Data/pistacia/cam_sampling_effort.csv",header=T, sep=",",dec=".")
+
+# I need to convert all data in visits/min/plant
+# First TIME TRANSFORMATION
+bct1 <- bc[,,]/(12*60*bceff[,7]) #I  HAVE NUMBER OF DAYS THE SEED TRAY WAS IN THE PLANT - DIVIDE BY DAYS*12*60 =renders visits/min (12 hours of the day, not 24)
+camt1 <- cam[,,]/cameff[,3] # I HAVE MINS THE CAMS WAS RECODING
+
+# Then AREA TRANSFORMATION 
+bceff$correc_fac <- bceff$plant_area/bceff$area_seed_trap # I CALCULATE A 
+                             # CORRECTION FACTOR i.e. plant area/seed tray area
+bct2 <- bct1[,,]*bceff[,8] #I multiply it by the feces found
+camt2 <- camt1[,,]*2 # I could multiply CAM DATA by 2 since the camera has only 
+                     # recorded half of the plant - SHOULD I? (Not included)
+# Comment PJ: Not necessary to x2 given that we're not trying to estimate an
+# actual visitation rate (i.e., a real value for visits), but just to standardize.
+# By the way, a x2 would simply rescale all the values and that's not relevant 
+# for our purpose here.
+
+# Then merging
+PUNseffortmerging<- (bct2+camt2)/2
+
+```
+
+
+## Bootstrap estimates of network modularity (M)
+
+We estimate the confidence intervals by resampling the five adjacency matrices
+obtained from the different methods and computing their average, SE, and CIs for modularity.
+
+We use function `m_boot` for this.
+
+Recall the final matrix Names:
+
+`bc = Original Barcoding matrix from Pistacia lentiscus`            
+`cam = Original GoPro matrix from Pistacia lentiscus`           
+`cualmerging = Cualitative matrix sum`            
+`cuanmerging = Cuantitative matrix sum`           
+`gtmerging = Grand Total Standarization`            
+`minmaxmerging = Min-max scaled matrix`           
+`seffortmerging = Sampling effort merging by mean among standardized matrices.`        
+
+## Functions to load
+### Function to estimate M from bootstrapped matrices.
+
+```{r m_boot.function}
+# Function for Bootstrap loop to estimate M for resampled matrices. ------------
+# USE WITH: m_boot(mymat, myresamp). myresamp defaults to 99.
+m_boot <- function (mymat, myresamp= 99)  {
+	TIME <- Sys.time()
+	# Resampling plan for bootstrapping n=99 adjacency matrices.
+	m.boot<- NULL
+	# mymat is the input matrix for which M is tested
+	# mlike is the observed mean M value (in general, mat@likelihood)
+	# The loop. PUT THIS IN A BOOT LOOP 
+	for (i in 1:myresamp) {
+		mat1 <- sample_frac(mymat, 0.8, replace= T)
+		mnmetrics <- computeModules(mat1, method="Beckett", 
+								   deep= FALSE, deleteOriginalFiles= FALSE, 
+								   steps= 1000, tolerance= 1e-10, 
+								   experimental= FALSE, forceLPA= FALSE)
+		m.boot<- rbind(m.boot, mnmetrics@likelihood)   
+	}
+	colnames(m.boot)<- c("MBoot") # m.boot saves the M values for bootstrapped 
+								  # matrices.
+	return(m.boot)
+	#
+	Sys.time() - TIME
+	#
+} 
+
+```
+
+
+# Modularity
+
+### Empirical, observed matrices
+#### DNA bar-coding
+
+```{r M_bc}
+M_bc <- computeModules(bc, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+M_bc@likelihood
+# Msig(bc, M_bc@likelihood)
+
+#m_boot(bc, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_bc@likelihood
+PUN_BC_Mboot <- as.data.frame(cbind(MObs, 
+									   colMeans(m.boot<-m_boot(bc, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_BC_Mboot<- cbind(PUN_BC_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_BC_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_BC_Mboot$rnd.se)
+
+PUN_BC_Mboot<- cbind(PUN_BC_Mboot, ci1, ci2)
+colnames(PUN_BC_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_BC_Mboot
+
+```
+
+
+#### Camera-traps
+
+```{r M_cam}
+M_cam <- computeModules(cam, method="Beckett", deep= FALSE, 
+					   deleteOriginalFiles= FALSE, steps= 1000, 
+					   tolerance= 1e-10, experimental= FALSE, forceLPA= FALSE)
+M_cam@likelihood
+# Msig(cam, M_cam@likelihood)
+#m_boot(bc, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_cam@likelihood
+PUN_CAM_Mboot <- as.data.frame(cbind(MObs, 
+									   colMeans(m.boot<-m_boot(cam, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_CAM_Mboot<- cbind(PUN_CAM_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_CAM_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_CAM_Mboot$rnd.se)
+
+PUN_CAM_Mboot<- cbind(PUN_CAM_Mboot, ci1, ci2)
+colnames(PUN_CAM_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_CAM_Mboot
+
+```
+
+### Merged matrices
+#### Cualitative matrix sum
+
+```{r M_cualmerging, warning=FALSE}
+M_cualmerging <- computeModules(PUNcualmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_cualmerging@likelihood
+# Msig(PUNcualmerging, M_cualmerging@likelihood)
+
+#m_boot(PUNcualmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_cualmerging@likelihood
+PUN_cualmerging_Mboot <- as.data.frame(cbind(MObs, 
+									   colMeans(m.boot<-m_boot(PUNcualmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_cualmerging_Mboot<- cbind(PUN_cualmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_cualmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_cualmerging_Mboot$rnd.se)
+
+PUN_cualmerging_Mboot<- cbind(PUN_cualmerging_Mboot, ci1, ci2)
+colnames(PUN_cualmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_cualmerging_Mboot
+
+```
+
+
+#### Cuantitative matrix sum
+
+```{r M_cuanmerging, warning=FALSE}
+M_cuanmerging <- computeModules(PUNcuanmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_cuanmerging@likelihood
+# Msig(PUNcuanmerging, M_cuanmerging@likelihood)
+
+# m_boot(PUNcuanmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_cuanmerging@likelihood
+PUN_cuanmerging_Mboot <- as.data.frame(cbind(MObs, 
+									   colMeans(m.boot<-m_boot(PUNcuanmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_cuanmerging_Mboot<- cbind(PUN_cuanmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_cuanmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_cuanmerging_Mboot$rnd.se)
+
+PUN_cuanmerging_Mboot<- cbind(PUN_cuanmerging_Mboot, ci1, ci2)
+colnames(PUN_cuanmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_cuanmerging_Mboot
+
+```
+
+
+#### Grand Total Standarization
+
+```{r M_gtmerging, warning=FALSE}
+M_gtmerging <- computeModules(PUNgtmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_gtmerging@likelihood
+# Msig(PUNgtmerging, M_gtmerging@likelihood)
+
+# m_boot(PUNgtmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_gtmerging@likelihood
+PUN_gtmerging_Mboot <- as.data.frame(cbind(MObs, 
+									 colMeans(m.boot<-m_boot(PUNgtmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_gtmerging_Mboot<- cbind(PUN_gtmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_gtmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_gtmerging_Mboot$rnd.se)
+
+PUN_gtmerging_Mboot<- cbind(PUN_gtmerging_Mboot, ci1, ci2)
+colnames(PUN_gtmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_gtmerging_Mboot
+
+```
+
+
+#### Min-max scaled matrix
+
+```{r M_minmaxmerging, warning=FALSE}
+M_minmaxmerging <- computeModules(PUNminmaxmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_minmaxmerging@likelihood
+# Msig(PUNminmaxmerging, M_minmaxmerging@likelihood)
+
+# m_boot(PUNminmaxmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_minmaxmerging@likelihood
+PUN_minmaxmerging_Mboot <- as.data.frame(cbind(MObs, 
+										 colMeans(m.boot<-m_boot(PUNminmaxmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_minmaxmerging_Mboot<- cbind(PUN_minmaxmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_minmaxmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_minmaxmerging_Mboot$rnd.se)
+
+PUN_minmaxmerging_Mboot<- cbind(PUN_minmaxmerging_Mboot, ci1, ci2)
+colnames(PUN_minmaxmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_minmaxmerging_Mboot
+
+```
+
+
+#### Sampling effort merging by mean among standardized matrices
+
+```{r M_seffortmerging, warning=FALSE}
+M_seffortmerging <- computeModules(PUNseffortmerging, method="Beckett", 
+								deep= FALSE, deleteOriginalFiles= FALSE, 
+								steps= 1000, tolerance= 1e-10, 
+								experimental= FALSE, forceLPA= FALSE)
+M_seffortmerging@likelihood
+# Msig(PUNseffortmerging, M_seffortmerging@likelihood)
+
+# m_boot(PUNseffortmerging, 99)
+# CHECK: m_boot is not saving object m.boot, so I'm resolving here... :(( Chapuza
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+MObs<- M_seffortmerging@likelihood
+PUN_seffortmerging_Mboot <- as.data.frame(cbind(MObs, 
+										  colMeans(m.boot<-m_boot(PUNseffortmerging, 99))))
+rnd.se <- apply(m.boot,2,sd)/sqrt(length(m.boot))   # SE randomized parameters
+PUN_seffortmerging_Mboot<- cbind(PUN_seffortmerging_Mboot, rnd.se)
+ci1 <-  MObs-(1.962*PUN_seffortmerging_Mboot$rnd.se)
+ci2 <-  MObs+(1.962*PUN_seffortmerging_Mboot$rnd.se)
+
+PUN_seffortmerging_Mboot<- cbind(PUN_seffortmerging_Mboot, ci1, ci2)
+colnames(PUN_seffortmerging_Mboot)<- c("MObs", "meanM.boot", "SE", 
+								   "CI_low",
+								   "CI_high")
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUN_seffortmerging_Mboot
+
+```
+
+------------------------------------------------------------------------------
+
+```{r session, echo=T}
+sessionInfo()
+
+```
+
+
+

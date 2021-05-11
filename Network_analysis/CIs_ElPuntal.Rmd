@@ -1,0 +1,561 @@
+---
+title: "Network indices confidence intervals - El Puntal"
+author: "Pedro Jordano"
+date: "11/17/2020"
+output: html_document
+---
+
+## Matrices
+
+Final matrix Names:
+
+`bc = Original Barcoding matrix from Pistacia lentiscus`   
+`cualmerging = Cualitative matrix sum`        
+`cuanmerging = Cuantitative matrix sum`          
+`gtmerging = Grand Total Standarization`         
+`minmaxmerging = Min-max scaled matrix`            
+`seffortmerging = Sampling effort merging by mean among standardized matrices.`       
+
+
+```{r load-data}
+# Load matrices
+
+pl.bc<- read.csv("../Case_studies_datasets/pl_bc_clean.csv",header=T,sep=",",dec=".")
+pl.cam<- read.csv("../Case_studies_datasets/pl_cam_clean.csv",header=T,sep=",",dec=".")
+
+# Convert all interactions in numeric
+bc <- as.data.frame(lapply(pl.bc, as.numeric))%>% 
+	column_to_rownames(var="X")
+# ??column_to_rownames
+cam <- as.data.frame(lapply(pl.cam, as.numeric)) %>% 
+	        column_to_rownames(var="X")
+
+# Qualitative combination
+PUNcuanmerging<- bc+cam
+PUNcualmerging= PUNcuanmerging
+PUNcualmerging[PUNcuanmerging!= 0]= 1
+
+# Quantitative sum
+PUNcuanmerging<- bc+cam
+
+# Grand total
+bct<- bc/sum(bc)
+camt<- cam/sum(cam)
+PUNgtmerging<- (bct+camt)/2
+
+# Min-Max scaling
+bct<- (bc-min(bc))/(max(bc)-min(bc))
+camt<- (cam-min(cam))/(max(cam)-min(cam))
+PUNminmaxmerging<- (bct+camt)/2
+
+# Sampling effort standardization
+bceff<- read.csv("../Case_studies_datasets/bc_sampling_effort.csv",header=T,sep=";",dec=".", comment.char = "#")
+cameff<- read.csv("../Case_studies_datasets/cam_sampling_effort.csv",header=T, sep=",",dec=".")
+
+# I need to convert all data in visits/h/plant
+# First TIME TRANSFORMATION
+bct1 <- bc[,,]/(12*bceff[,7]) #I  HAVE NUMBER OF DAYS THE SEED TRAY WAS IN THE PLANT - DIVIDE BY DAYS*12 =renders visits/h (12 hours of the day, not 24)
+camt1 <- cam[,,]/(cameff[,3]/60) # I HAVE MINS THE CAMS WAS RECODING
+
+# Then AREA TRANSFORMATION 
+bceff$correc_fac <- bceff$plant_area/bceff$area_seed_trap # I CALCULATE A 
+                             # CORRECTION FACTOR i.e. plant area/seed tray area
+bct2 <- bct1[,,]*bceff[,8] #I multiply it by the feces found
+camt2 <- camt1[,,]*2 # I could multiply CAM DATA by 2 since the camera has only 
+                     # recorded half of the plant - SHOULD I? (Not included)
+
+# Then merging
+PUNseffortmerging<- (bct2+camt2)/2
+
+```
+
+
+### Cualitative matrix sum
+
+```{r CIs_PUNcualmerging}
+#
+# PUNcualmerging = Cualitative matrix sum
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- PUNcualmerging
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    								   		      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+PUNcualmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNcualmerging_boot<- cbind(PUNcualmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNcualmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNcualmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNcualmerging_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNcualmerging_boot$rnd.se)
+
+# PUNcualmerging_boot<- cbind(PUNcualmerging_boot, t(ci1), t(ci2))
+PUNcualmerging_boot<- cbind(PUNcualmerging_boot, ci1, ci2)
+colnames(PUNcualmerging_boot)<- c("mean.boot", "SE", 
+								  "CI_low",
+								  "CI_high")
+PUNcualmerging_boot<- cbind(PUNobs,PUNcualmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNcualmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+### Cuantitative matrix sum
+
+```{r CIs_PUNcuanmerging}
+#
+# PUNcuanmerging = Cuantitative matrix sum
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- PUNcuanmerging
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootstrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		 "NODF",
+    									   		 "weighted NODF",
+    							 	   		     "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstrapped parameter differences values as dataframe. -------------
+PUNcuanmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNcuanmerging_boot<- cbind(PUNcuanmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNcuanmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNcuanmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNcuanmerging_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNcuanmerging_boot$rnd.se)
+
+# PUNcuanmerging_boot<- cbind(PUNcuanmerging_boot, t(ci1), t(ci2))
+PUNcuanmerging_boot<- cbind(PUNcuanmerging_boot, ci1, ci2)
+colnames(PUNcuanmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+PUNcuanmerging_boot<- cbind(PUNobs,PUNcuanmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNcuanmerging_boot
+
+#
+Sys.time() - TIME
+#
+   
+```
+
+### Grand Total Standardization
+
+```{r CIs_PUNgtmerging}
+#
+# PUNgtmerging = Grand Total Standardization
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- PUNgtmerging
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		 "NODF",
+    									   		 "weighted NODF",
+    							 	   		     "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+PUNgtmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNgtmerging_boot<- cbind(PUNgtmerging_boot, rnd.se)
+# ci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNgtmerging_boot$rnd.se))
+# ci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNgtmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNgtmerging_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNgtmerging_boot$rnd.se)
+
+# PUNgtmerging_boot<- cbind(PUNgtmerging_boot, t(ci1), t(ci2))
+PUNgtmerging_boot<- cbind(PUNgtmerging_boot, ci1, ci2)
+colnames(PUNgtmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+PUNgtmerging_boot<- cbind(PUNobs,PUNgtmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNgtmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+
+```
+
+### Min-max scaled matrix
+
+```{r CIs_PUNminmaxmerging}
+#
+# PUNminmaxmerging = Min-max scaled matrix
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- PUNminmaxmerging
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+PUNminmaxmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNminmaxmerging_boot<- cbind(PUNminmaxmerging_boot, rnd.se)
+# cci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNminmaxmerging_boot$rnd.se))
+# cci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNminmaxmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNminmaxmerging_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNminmaxmerging_boot$rnd.se)
+
+PUNminmaxmerging_boot<- cbind(PUNminmaxmerging_boot, ci1, ci2)
+colnames(PUNminmaxmerging_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+PUNminmaxmerging_boot<- cbind(PUNobs,PUNminmaxmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNminmaxmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+
+### Sampling effort standadrdized matrix
+
+Sampling effort merging by mean among standardized matrices.
+ 
+```{r CIs_PUNseffortmerging}
+#
+# PUNseffortmerging = Min-max scaled matrix
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- PUNseffortmerging
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+PUNseffortmerging_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNseffortmerging_boot<- cbind(PUNseffortmerging_boot, rnd.se)
+# cci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNseffortmerging_boot$rnd.se))
+# cci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNseffortmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNseffortmerging_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNseffortmerging_boot$rnd.se)
+
+# PUNseffortmerging_boot<- cbind(PUNseffortmerging_boot, t(ci1), t(ci2))
+PUNseffortmerging_boot<- cbind(PUNseffortmerging_boot, ci1, ci2)
+colnames(PUNseffortmerging_boot)<- c("mean.boot", "SE", 
+							 	     "CI_low",
+								     "CI_high")
+
+PUNseffortmerging_boot<- cbind(PUNobs,PUNseffortmerging_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNseffortmerging_boot
+
+#
+Sys.time() - TIME
+#
+
+```
+
+
+
+### DNA-Barcoding matrix
+```{r CIs_Barcoding}
+#
+# 
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- bc
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+PUNBC_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNBC_boot<- cbind(PUNBC_boot, rnd.se)
+# cci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNminmaxmerging_boot$rnd.se))
+# cci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNminmaxmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNBC_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNBC_boot$rnd.se)
+
+PUNBC_boot<- cbind(PUNBC_boot, ci1, ci2)
+colnames(PUNBC_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+PUNBC_boot<- cbind(PUNobs,PUNBC_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNBC_boot
+
+```
+
+
+### GO-PRO matrix
+```{r CIs_GoPro}
+#
+# 
+
+require(bootstrap)
+require(bipartite)
+require(sampling)
+#
+# Bootstrap loop to create the boot matrices --------------
+
+TIME <- Sys.time()
+mat <- cam
+PUNobs<- as.vector(networklevel(mat, 
+    			  index = c("connectance",
+    			  		    "NODF",
+    						"weighted NODF",
+    						"weighted connectance")))
+#In table 2, connectance value is calculated by dividing 91 pairwise interactions in goPro monitoring by 640 which is the nomber of possible pairwise interactions considering the matrix size of the merged matrix (in this case the same size than DNA-Barcoding matrix).
+
+# Resampling plan for bootsrapping n=99 adjacency matrices.
+resamp <- 99                # Number of bootstrap samples required
+mnmetrics_boot<- NULL
+
+# The loop. PUT THIS IN A BOOT LOOP 
+for (i in 1:resamp) {
+    mat1 <- sample_frac(mat, 0.8, replace= T)
+    mnmetrics<- as.vector(networklevel(mat1, 
+    								   index = c("connectance",
+    									   		  "NODF",
+    									   		  "weighted NODF",
+    							 	   	  	      "weighted connectance")))
+    mnmetrics_boot<- rbind(mnmetrics_boot, mnmetrics)   
+}
+	colnames(mnmetrics_boot)<- c("connectance", "NODF", 
+								 "weighted NODF",
+								 "weighted connectance")
+
+# Outputs bootstraped parameter differences values as dataframe. -------------
+PUNCAM_boot <- as.data.frame(colMeans(mnmetrics_boot))
+rnd.se <- as.vector(apply(mnmetrics_boot,2,sd)/sqrt(resamp)) # SE randomized parameters
+PUNCAM_boot<- cbind(PUNCAM_boot, rnd.se)
+# cci1 <-  t(as.vector(apply(mnmetrics_boot,2,mean)-1.962*PUNminmaxmerging_boot$rnd.se))
+# cci2 <-  t(as.matrix(apply(mnmetrics_boot,2,mean)+1.962*PUNminmaxmerging_boot$rnd.se))
+ci1 <-  PUNobs-(1.962*PUNCAM_boot$rnd.se)
+ci2 <-  PUNobs+(1.962*PUNCAM_boot$rnd.se)
+
+PUNCAM_boot<- cbind(PUNCAM_boot, ci1, ci2)
+colnames(PUNCAM_boot)<- c("mean.boot", "SE", 
+								 "CI_low",
+								 "CI_high")
+
+PUNCAM_boot<- cbind(PUNobs,PUNCAM_boot)
+
+#
+# Output parameters
+# meandf         # Bootstrap mean of parameter values
+# SE             # Bootstrap SE for parameter values
+# CI_low         # Bootstrap CI (lower) 
+# CI_high        # Bootstrap CI (higher) 
+PUNCAM_boot
+
+```
+
+
+
+
+
+------------------------------------------------------------------------------
+
+
+```{r session, echo=T}
+sessionInfo()
+
+```
+
+

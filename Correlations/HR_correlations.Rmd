@@ -1,0 +1,248 @@
+---
+title: "Hato Ratón correlations"
+author: "Elena Quintero"
+date: "`r Sys.Date()`"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library, warning=F, message=F}
+library(tidyverse)
+library(tibble)
+library(RColorBrewer)
+library(gridExtra)
+library(ggplot2)
+library(ggpubr)
+```
+
+Read data
+```{r}
+mn <- read.csv("../Case_studies_datasets/hr_mn_clean.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="AASPECIES")
+obs <- read.csv("../Case_studies_datasets/hr_obs_clean.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="AASPECIES")
+QC <- read.csv("../Data_merging/HR_QC.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+QS <- read.csv("../Data_merging/HR_QS.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+GTS <- read.csv("../Data_merging/HR_GTS.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+MMS <- read.csv("../Data_merging/HR_MMS.csv",header=T,sep=",",dec=".")%>% 
+	column_to_rownames(var="X")
+```
+
+Apply long format to matrices:
+
+```{r matrices to lists, include=F}
+MN.long<- mn %>% 
+  rownames_to_column(var="bird")%>%
+  pivot_longer(-bird, names_to = "plant", values_to = "visits.mn")
+
+OBS.long<- obs %>% 
+  rownames_to_column(var="bird")%>%
+  pivot_longer(-bird, names_to = "plant", values_to = "visits.obs")
+
+QC.long<- QC %>% 
+  rownames_to_column(var="bird")%>%
+  pivot_longer(-bird, names_to = "plant", values_to = "visits.qc")
+
+QS.long<- QS %>% 
+  rownames_to_column(var="bird")%>%
+  pivot_longer(-bird, names_to = "plant", values_to = "visits.qs")
+
+GTS.long<- GTS %>% 
+  rownames_to_column(var="bird")%>%
+  pivot_longer(-bird, names_to = "plant", values_to = "visits.gts")
+
+MMS.long<- MMS %>% 
+  rownames_to_column(var="bird")%>%
+  pivot_longer(-bird, names_to = "plant", values_to = "visits.mms")
+```
+
+Combine all merging methods together in a single dataset and calculate a Coefficient of Variation for 'Standardizing' methods
+
+```{r, include=F}
+all.long <- right_join(MN.long, OBS.long)%>%
+  right_join(QC.long) %>%
+  right_join(QS.long) %>% 
+  right_join(GTS.long) %>%
+  right_join(MMS.long) %>%
+  dplyr::rowwise() %>% mutate(SD=sd(c(visits.gts,visits.mms)),
+                              MEAN=mean(c(visits.gts,visits.mms)), CV=SD/MEAN)
+```
+
+
+## COMPARING BETWEEN QUANTITATIVE METHODS
+
+```{r comparing between methods, warning=F, message=F, echo=F}
+QS_GTS <- ggplot(data=all.long, aes(x=(visits.qs), y=(visits.gts)))+geom_point()+
+  theme_bw()+xlab(" QS")+ylab(" GTS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+
+  geom_smooth(color="#0570b0", size=0.5)
+QS_MMS <- ggplot(data=all.long, aes(x=(visits.qs), y=(visits.mms)))+geom_point()+
+  theme_bw()+xlab(" QS")+ylab(" MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+
+  geom_smooth(color="#0570b0", size=0.5)
+GTS_MMS <- ggplot(data=all.long, aes(x=(visits.gts), y=(visits.mms)))+geom_point()+
+  theme_bw()+xlab(" GTS")+ylab(" MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+
+  geom_smooth(color="#0570b0", size=0.5)
+
+grid.arrange(QS_GTS, QS_MMS, GTS_MMS, ncol=3)
+```
+outlier: *Pistacia lentiscus - Sylvia atricapilla*
+
+Now with data log-transformed to control for 0 inflated matrices.
+```{r comparing between methods 2, warning=F, message=F, echo=F}
+QS_GTS <- ggplot(data=all.long, aes(x=log(visits.qs), y=log(visits.gts)))+geom_point()+
+  theme_bw()+xlab("log QS")+ylab("log GTS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+
+  geom_smooth(color="#0570b0", size=0.5)
+QS_MMS <- ggplot(data=all.long, aes(x=log(visits.qs), y=log(visits.mms)))+geom_point()+
+  theme_bw()+xlab("log QS")+ylab("log MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+
+  geom_smooth(color="#0570b0", size=0.5)
+GTS_MMS <- ggplot(data=all.long, aes(x=log(visits.gts), y=log(visits.mms)))+geom_point()+
+  theme_bw()+xlab("log GTS")+ylab("log MMS")+
+  #geom_smooth(method=lm)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")+
+  geom_smooth(color="#0570b0", size=0.5)
+
+grid.arrange(QS_GTS, QS_MMS, GTS_MMS, ncol=3)
+```
+
+-   **All correlations showed in the graphs are kendall's tau (based in ranking for non-parametric data).**
+-  All methods are relatively similar, since they are highly correlated. 
+- Less correlated QS and MMS.
+
+### METHODS CORRELATIONS
+```{r cors}
+pearson <- cor(x=all.long[,c(3,4,6:8)], method = "pearson")
+
+kendall <- cor(x=all.long[,c(3,4,6:8)], method = "kendall")
+```
+
+Correlation plot:
+
+```{r cors 2}
+library(corrplot)
+library(RColorBrewer)
+
+col <- colorRampPalette(c("white", "white","white", "white","white", "white", "white",  "white", "white","#D9EF8B","#A6D96A","#66BD63"))
+
+col2 <- colorRampPalette(c("white", "white","white", "white","white", "white", "white",  "white", "white","#edf8b1","#7fcdbb","#2c7fb8"))
+
+corrplot(pearson, method = "color",type="upper",number.cex = .7,addCoef.col="black", tl.col = "black", col=col2(40), title="Pearson UP vs Kendall DOWN", tl.pos = "d",tl.srt = 45, cl.pos = "n")
+
+corrplot(kendall, method = "color",type="lower",number.cex = .7,addCoef.col=T, tl.col = "black",  col=col2(40),diag = FALSE, tl.pos = "n", cl.pos = "n",add=T)
+```
+
+```{r, include=F}
+# #with confidence intervals
+# library(psych)
+# cor.ci(x=all.long[,c(3,4,6:8)], method = "pearson")
+# cor.ci(x=all.long[,c(3,4,6:8)], method = "kendall")
+# f<-cor.plot.upperLowerCi(e)
+```
+
+### COMPARING METHODOLOGIES WITH MERGING METHODS
+
+*Number of registers for each methodology*
+
+Mist-Netting:
+```{r, echo=F}
+sum(mn)
+```
+
+Focal Observations:
+```{r, echo=F}
+sum(obs)
+```
+
+Here we observe the relationship between the 2 methodologies used in the field (logarithm converted):
+
+```{r echo=F, warning=F, message=F, echo=F}
+log_MN_OBS <- ggplot(data=all.long, aes(x=log(visits.mn), y=log(visits.obs)))+geom_point()+
+  theme_bw()+xlab("log Mist-netting")+ylab("log Focal Observations")+
+  #geom_smooth(color="violetred4", size=0.5)+ 
+  geom_smooth(method=lm, color="#0570b0", size=0.5)+
+  stat_cor(aes(label = ..r.label..), method="kendall")+  
+  labs(title="Methodology comparision: Mist-netting vs. Observations")
+log_MN_OBS 
+```
+
+All points standing on the x and y-axis are interactions undetected with one or the other method.
+
+### How well each "merging method" values the different two methodologies
+
+#### QUANTITATIVE SUM (QS)
+
+Log transformed:
+
+```{r  warning=F, message=F}
+QS_mn_log <- ggplot(data=all.long, aes(x=log(visits.qs), y=log(visits.mn)))+geom_point()+
+  theme_bw()+ylab("log Mist-netting")+xlab("log QS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+QS_obs_log <- ggplot(data=all.long, aes(x=log(visits.qs), y=log(visits.obs)))+geom_point()+
+  theme_bw()+ylab("log Focal Obs")+xlab("log QS")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(QS_mn_log, QS_obs_log, ncol=2, top="How QS merging treats each metholodgy (logs)")
+```
+
+#### Grand Total Standarization (GTS)
+
+Log transformed:
+
+```{r echo=F,  warning=F, message=F}
+gts_mn_log <- ggplot(data=all.long, aes(x=log(visits.gts), y=log(visits.mn)))+geom_point()+
+  theme_bw()+ylab("log Mist-netting")+xlab("log gts")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+gts_obs_log <- ggplot(data=all.long, aes(x=log(visits.gts), y=log(visits.obs)))+geom_point()+
+  theme_bw()+ylab("log Focal Obs")+xlab("log gts")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(gts_mn_log, gts_obs_log, ncol=2, top="How GTS merging treats each metholodgy (logs)")
+```
+
+#### MIN-MAX SCALING (MMS)
+
+Log transformed:
+
+```{r echo=F,  warning=F, message=F}
+mms_mn_log <- ggplot(data=all.long, aes(x=log(visits.mms), y=log(visits.mn)))+geom_point()+
+  theme_bw()+ylab("log Mist-netting")+xlab("log mms")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+mms_obs_log <- ggplot(data=all.long, aes(x=log(visits.mms), y=log(visits.obs)))+geom_point()+
+  theme_bw()+ylab("log Focal Obs")+xlab("log mms")+
+  geom_smooth(color="#0570b0", size=0.5)+
+  #geom_smooth(method=lm, color="violetred1", size=0.5)+ 
+  stat_cor(aes(label = ..r.label..), method="kendall")
+
+grid.arrange(mms_mn_log, mms_obs_log, ncol=2, top="How MMS merging treats each metholodgy (logs)")
+```
+
+SUMMARY:
+
+- Higher correlation (Kendall) of QS and GTS methods with the mist-netting data.
