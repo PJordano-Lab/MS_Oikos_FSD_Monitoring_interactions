@@ -4,7 +4,7 @@ This is a public repository for the data, analysis, and code included in our pap
 
 **Title**: Methodological overview and data-merging approaches in the study of plant-frugivore interactions
 
-**Authors:** Elena Quintero^1^, Jorge Isla^1^ and Pedro Jordano^1,2^
+**Authors:** Elena Quintero<sup>1</sup>, Jorge Isla<sup>1</sup> and Pedro Jordano<sup>1,2</sup>
 
 1\. Estación Biológica de Doñana, CSIC, Av. Americo Vespucio 24, E-41092 Sevilla, Spain
 
